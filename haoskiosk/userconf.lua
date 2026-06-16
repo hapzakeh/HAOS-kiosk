@@ -393,6 +393,60 @@ webview.add_signal("init", function(view)
         -- Inject websocket recovery monitor script into the webview (once per load-finished)
         v:eval_js(js_ws_recovery, { source = "ws_recovery.js", no_return = true })
 
+        -- Filter out ghost touches shorter than MIN_TOUCH_MS milliseconds
+        -- Prevents synthetic click/pointerup events from very brief accidental contacts
+        local js_ghost_touch_filter = [[
+            (function() {
+                if (window._ghostTouchFilterInstalled) return;
+                window._ghostTouchFilterInstalled = true;
+
+                var MIN_TOUCH_MS = 200;
+                var activeTouches = new Map();
+
+                document.addEventListener('touchstart', function(e) {
+                    for (var i = 0; i < e.changedTouches.length; i++) {
+                        activeTouches.set(e.changedTouches[i].identifier, Date.now());
+                    }
+                }, { passive: true, capture: true });
+
+                document.addEventListener('touchend', function(e) {
+                    for (var i = 0; i < e.changedTouches.length; i++) {
+                        var id = e.changedTouches[i].identifier;
+                        var startTime = activeTouches.get(id);
+                        activeTouches.delete(id);
+                        if (startTime !== undefined && (Date.now() - startTime) < MIN_TOUCH_MS) {
+                            e.preventDefault();        // Suppresses synthetic click/mouseup/pointerup
+                            e.stopImmediatePropagation();
+                        }
+                    }
+                }, { passive: false, capture: true });
+
+                document.addEventListener('touchcancel', function(e) {
+                    for (var i = 0; i < e.changedTouches.length; i++) {
+                        activeTouches.delete(e.changedTouches[i].identifier);
+                    }
+                }, { capture: true });
+            })();
+        ]]
+        v:eval_js(js_ghost_touch_filter, { source = "ghost_touch_filter.js", no_return = true })
+
+        -- Disable pinch-to-zoom to mitigate ghost touch issues on touchscreens
+        -- Sets touch-action CSS to allow only panning, not zooming gestures
+        local js_disable_pinch_zoom = [[
+            (function() {
+                if (!document.getElementById('haoskiosk-no-pinch-zoom')) {
+                    var style = document.createElement('style');
+                    style.id = 'haoskiosk-no-pinch-zoom';
+                    style.textContent = 'html, body, * { touch-action: pan-x pan-y !important; }';
+                    (document.head || document.documentElement).appendChild(style);
+                    // Add gesture listeners once per document alongside the style guard
+                    document.addEventListener('gesturestart',  function(e) { e.preventDefault(); }, { passive: false, capture: true });
+                    document.addEventListener('gesturechange', function(e) { e.preventDefault(); }, { passive: false, capture: true });
+                }
+            })();
+        ]]
+        v:eval_js(js_disable_pinch_zoom, { source = "disable_pinch_zoom.js", no_return = true })
+
     end)
 
     -- If browser_refresh set, then refresh browser every browser_refresh seconds after page finished/loaded/reloaded

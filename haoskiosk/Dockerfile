@@ -40,6 +40,7 @@ RUN apk update && apk add --no-cache \
      evtest \
 ### Window, mouse, keyboard management
      openbox \
+     picom \
      onboard \
      unclutter-xfixes \
      ttf-dejavu \

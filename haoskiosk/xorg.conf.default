@@ -54,4 +54,5 @@ Section "InputClass"
     Driver 		"libinput"
     Option 		"Tapping" "on"
     Option		"TappingDrag" "on"  # Enables tap-and-drag
+    Option		"Gestures" "off"    # Disable gesture recognition (pinch-to-zoom, swipe gestures)
 EndSection

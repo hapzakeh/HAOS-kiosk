@@ -425,6 +425,9 @@ rm /tmp/new_keybinds.xml
 # Start openbox
 openbox &
 
+# Start picom compositor to prevent stale X11 rendering artifacts (ghost/overlapping views)
+picom --daemon --backend xrender --no-fading-openclose 2>/dev/null &
+
 #WINMGR=xfwm4  #Alternately using xfwm4
 #xfsettingsd &
 #startxfce4 &

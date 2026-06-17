@@ -283,6 +283,7 @@ def run_type_a(dev, dpy, sx, sy):
 # ---------------------------------------------------------------------------
 
 def main():
+    print(f"touch_filter: starting (MIN_TAP_MS={MIN_TAP_MS})", flush=True)
     dev = None
     for attempt in range(1, 6):
         dev = find_mt_device()

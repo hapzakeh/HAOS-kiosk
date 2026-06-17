@@ -1,4 +1,4 @@
-# HAOS-kiosk - hapz v22
+# HAOS-kiosk - hapz v23
 
 Display HA dashboards in kiosk mode directly on your HAOS server.
 

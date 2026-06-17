@@ -365,7 +365,7 @@ xinput list | sed 's/^/  /'
 # in WebKitGTK.  Must run while X is live so udev can hotplug the virtual device.
 if python3 -c "import evdev" >/dev/null 2>&1; then
     bashio::log.info "Starting touch_filter.py to block pinch-to-zoom..."
-    python3 -u /touch_filter.py 2>&1 | sed 's/^/[touch_filter] /' &
+    python3 -u /touch_filter.py 2>&1 | awk '{ print "[touch_filter] " $0; fflush() }' &
     TOUCH_FILTER_PID=$!
     sleep 2  # give uinput device time to appear and X to hotplug it
     if kill -0 "$TOUCH_FILTER_PID" 2>/dev/null; then

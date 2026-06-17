@@ -59,7 +59,6 @@ devices:
   - /dev/input/event23
   - /dev/input/event24
   - /dev/input/event25
-  - /dev/uinput
 
 map:
   - addon_config:rw

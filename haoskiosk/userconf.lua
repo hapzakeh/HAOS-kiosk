@@ -393,69 +393,66 @@ webview.add_signal("init", function(view)
         -- Inject websocket recovery monitor script into the webview (once per load-finished)
         v:eval_js(js_ws_recovery, { source = "ws_recovery.js", no_return = true })
 
-        -- Filter out ghost touches shorter than MIN_TOUCH_MS milliseconds
-        -- Prevents synthetic click/pointerup events from very brief accidental contacts
+        -- Filter out ghost presses shorter than MIN_PRESS_MS milliseconds.
+        -- touch_filter.py grabs the physical MT device and re-emits it as a
+        -- single-touch uinput pointer, so WebKitGTK sees mouse events only —
+        -- no touchstart/touchend ever fires.  We therefore time mousedown→mouseup
+        -- instead and suppress the resulting click (and mousedown for any rapid
+        -- repeat ghost presses that fall inside the suppression window).
         local js_ghost_touch_filter = [[
             (function() {
                 if (window._ghostTouchFilterInstalled) return;
                 window._ghostTouchFilterInstalled = true;
 
-                var MIN_TOUCH_MS = 50;
-                var activeTouches = new Map();
-                // Use a timestamp window instead of a boolean flag so it
-                // auto-expires even if no synthetic event ever follows.
-                var suppressUntil = 0;
+                var MIN_PRESS_MS = 50;   // presses shorter than this are ghost touches
+                var pressStart    = 0;   // timestamp of current mousedown (0 = none)
+                var suppressUntil = 0;   // suppress click/mousedown until this timestamp
 
                 function isSuppressed() {
                     return Date.now() < suppressUntil;
                 }
 
-                console.log('GhostTouchFilter: installed, MIN_TOUCH_MS=' + MIN_TOUCH_MS);
+                console.log('GhostTouchFilter: installed (pointer mode), MIN_PRESS_MS=' + MIN_PRESS_MS);
 
-                document.addEventListener('touchstart', function(e) {
-                    for (var i = 0; i < e.changedTouches.length; i++) {
-                        var id = e.changedTouches[i].identifier;
-                        activeTouches.set(id, Date.now());
-                        console.log('GhostTouchFilter: touchstart id=' + id);
+                // Record press time.  Also suppress rapid repeat ghost presses
+                // that arrive while the suppression window is still open.
+                document.addEventListener('mousedown', function(e) {
+                    if (isSuppressed()) {
+                        e.preventDefault();
+                        e.stopImmediatePropagation();
+                        console.log('GhostTouchFilter: suppressed mousedown (in window)');
+                        return;
                     }
-                }, { passive: true, capture: true });
+                    pressStart = Date.now();
+                    console.log('GhostTouchFilter: mousedown');
+                }, { capture: true });
 
-                document.addEventListener('touchend', function(e) {
-                    for (var i = 0; i < e.changedTouches.length; i++) {
-                        var id = e.changedTouches[i].identifier;
-                        var startTime = activeTouches.get(id);
-                        activeTouches.delete(id);
-                        var duration = startTime !== undefined ? (Date.now() - startTime) : -1;
-                        console.log('GhostTouchFilter: touchend id=' + id + ' duration=' + duration + 'ms (threshold=' + MIN_TOUCH_MS + ')');
-                        if (startTime !== undefined && duration < MIN_TOUCH_MS) {
-                            console.log('GhostTouchFilter: suppressed touch id=' + id + ' duration=' + duration + 'ms');
-                            e.preventDefault();
-                            e.stopImmediatePropagation();
-                            // Suppress synthetic mouse/pointer events for 500 ms.
-                            // mousedown must be blocked to prevent <select> dropdowns
-                            // from opening; click alone is not sufficient.
-                            suppressUntil = Date.now() + 500;
-                        }
+                // Measure duration; if below threshold, open a suppression window.
+                document.addEventListener('mouseup', function(e) {
+                    if (pressStart === 0) return;
+                    var duration = Date.now() - pressStart;
+                    pressStart = 0;
+                    console.log('GhostTouchFilter: mouseup duration=' + duration + 'ms');
+                    if (duration < MIN_PRESS_MS) {
+                        suppressUntil = Date.now() + 500;
+                        e.preventDefault();
+                        e.stopImmediatePropagation();
+                        console.log('GhostTouchFilter: ghost press, suppressing click for 500ms');
                     }
-                }, { passive: false, capture: true });
+                }, { capture: true });
 
-                // Block all synthetic mouse/pointer events that WebKitGTK fires
-                // after a suppressed touch (mousedown opens <select> dropdowns
-                // before click ever fires, so click alone is not sufficient).
-                ['mousedown', 'mouseup', 'pointerdown', 'pointerup', 'click'].forEach(function(type) {
-                    document.addEventListener(type, function(e) {
-                        if (isSuppressed()) {
-                            e.preventDefault();
-                            e.stopImmediatePropagation();
-                            console.log('GhostTouchFilter: suppressed ' + type);
-                        }
-                    }, { capture: true });
-                });
-
-                document.addEventListener('touchcancel', function(e) {
-                    for (var i = 0; i < e.changedTouches.length; i++) {
-                        activeTouches.delete(e.changedTouches[i].identifier);
+                // Suppress the click that WebKitGTK fires after mouseup.
+                document.addEventListener('click', function(e) {
+                    if (isSuppressed()) {
+                        e.preventDefault();
+                        e.stopImmediatePropagation();
+                        console.log('GhostTouchFilter: suppressed click');
                     }
+                }, { capture: true });
+
+                // Reset if the press is cancelled (e.g. by a scroll or gesture).
+                document.addEventListener('mouseleave', function() {
+                    pressStart = 0;
                 }, { capture: true });
             })();
         ]]

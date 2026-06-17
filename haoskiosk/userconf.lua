@@ -402,7 +402,13 @@ webview.add_signal("init", function(view)
 
                 var MIN_TOUCH_MS = 50;
                 var activeTouches = new Map();
-                var suppressNextClick = false;
+                // Use a timestamp window instead of a boolean flag so it
+                // auto-expires even if no synthetic event ever follows.
+                var suppressUntil = 0;
+
+                function isSuppressed() {
+                    return Date.now() < suppressUntil;
+                }
 
                 document.addEventListener('touchstart', function(e) {
                     for (var i = 0; i < e.changedTouches.length; i++) {
@@ -417,24 +423,28 @@ webview.add_signal("init", function(view)
                         activeTouches.delete(id);
                         if (startTime !== undefined && (Date.now() - startTime) < MIN_TOUCH_MS) {
                             console.log('GhostTouchFilter: suppressed touch id=' + id + ' duration=' + (Date.now() - startTime) + 'ms');
-                            e.preventDefault();        // Suppresses synthetic click/mouseup/pointerup
+                            e.preventDefault();
                             e.stopImmediatePropagation();
-                            suppressNextClick = true;  // Belt-and-suspenders: also block the click event
+                            // Suppress synthetic mouse/pointer events for 500 ms.
+                            // mousedown must be blocked to prevent <select> dropdowns
+                            // from opening; click alone is not sufficient.
+                            suppressUntil = Date.now() + 500;
                         }
                     }
                 }, { passive: false, capture: true });
 
-                // WebKitGTK dispatches a synthetic click independently of the touch
-                // sequence, so preventDefault on touchend alone does not always cancel
-                // it.  Intercept click in capture phase and drop it when flagged.
-                document.addEventListener('click', function(e) {
-                    if (suppressNextClick) {
-                        suppressNextClick = false;
-                        e.preventDefault();
-                        e.stopImmediatePropagation();
-                        console.log('GhostTouchFilter: suppressed click');
-                    }
-                }, { capture: true });
+                // Block all synthetic mouse/pointer events that WebKitGTK fires
+                // after a suppressed touch (mousedown opens <select> dropdowns
+                // before click ever fires, so click alone is not sufficient).
+                ['mousedown', 'mouseup', 'pointerdown', 'pointerup', 'click'].forEach(function(type) {
+                    document.addEventListener(type, function(e) {
+                        if (isSuppressed()) {
+                            e.preventDefault();
+                            e.stopImmediatePropagation();
+                            console.log('GhostTouchFilter: suppressed ' + type);
+                        }
+                    }, { capture: true });
+                });
 
                 document.addEventListener('touchcancel', function(e) {
                     for (var i = 0; i < e.changedTouches.length; i++) {

@@ -55,6 +55,7 @@ RUN apk update && apk add --no-cache \
 #    py3-pip \
     py3-aiohttp \
     py3-xlib \
+    py3-evdev \
 ### Sound
      pulseaudio-utils \
 #     alsa-utils alsa-plugins-pulse \
@@ -82,6 +83,7 @@ COPY run.sh /
 RUN chmod a+x /run.sh
 
 COPY mouse_touch_inputs.py gesture_commands.json /
+COPY touch_filter.py /
 COPY rest_server.py /
 
 #### Patches

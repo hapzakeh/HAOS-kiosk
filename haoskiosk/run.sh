@@ -360,6 +360,25 @@ bashio::log.info "X server started successfully after $i seconds..."
 echo "xinput list:"
 xinput list | sed 's/^/  /'
 
+#### Start touch filter — grabs physical multi-touch screen and replaces it
+# with a single-touch virtual device, preventing GtkGestureZoom pinch-to-zoom
+# in WebKitGTK.  Must run while X is live so udev can hotplug the virtual device.
+if python3 -c "import evdev" >/dev/null 2>&1; then
+    bashio::log.info "Starting touch_filter.py to block pinch-to-zoom..."
+    python3 -u /touch_filter.py 2>&1 | sed 's/^/[touch_filter] /' &
+    TOUCH_FILTER_PID=$!
+    sleep 2  # give uinput device time to appear and X to hotplug it
+    if kill -0 "$TOUCH_FILTER_PID" 2>/dev/null; then
+        bashio::log.info "Touch filter running (PID=$TOUCH_FILTER_PID)"
+        echo "xinput list after touch filter:"
+        xinput list | sed 's/^/  /'
+    else
+        bashio::log.warning "Touch filter exited early (no MT device found, or evdev error)"
+    fi
+else
+    bashio::log.warning "py3-evdev not installed — touch filter disabled (pinch-to-zoom may be active)"
+fi
+
 #Stop console blinking cursor (this projects through the X-screen)
 echo -e "\033[?25l" > /dev/console
 

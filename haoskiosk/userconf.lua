@@ -450,14 +450,29 @@ webview.add_signal("init", function(view)
 
     end)
 
+    -- Route JS console messages to luakit log (enable_write_console_messages_to_stdout
+    -- does not reliably capture output from eval_js injected scripts)
+    view:add_signal("console-message", function(v, message, line, source)
+        msg.info("JS [%s:%d]: %s", source or "?", line or 0, message)
+    end)
+
     -- Prevent pinch-to-zoom: WebKitGTK handles pinch gestures natively at the GTK layer,
-    -- so CSS touch-action and JS gesture events don't block it. Reset zoom_level whenever
-    -- WebKit changes it (e.g., via a pinch gesture).
-    view:add_signal("property::zoom_level", function(v)
-        local target = zoom_level / 100.0
-        if math.abs((v.zoom_level or 1.0) - target) > 0.001 then
-            v.zoom_level = target
+    -- so CSS touch-action and JS gesture events don't block it. Poll zoom_level and reset
+    -- it if a pinch gesture changes it.
+    local zoom_target = zoom_level / 100.0
+    local zoom_guard = timer { interval = 100 }
+    zoom_guard:add_signal("timeout", function()
+        if not view.is_alive then return end
+        local current = view.zoom_level or 1.0
+        if math.abs(current - zoom_target) > 0.001 then
+            msg.info("Pinch zoom detected (%.2f -> %.2f), resetting", current, zoom_target)
+            view.zoom_level = zoom_target
         end
+    end)
+    zoom_guard:start()
+    view:add_signal("destroy", function()
+        zoom_guard:stop()
+        zoom_guard = nil
     end)
 
     -- If browser_refresh set, then refresh browser every browser_refresh seconds after page finished/loaded/reloaded

@@ -22,6 +22,10 @@ from Xlib.ext import xtest as xt
 SCROLL_THRESHOLD  = 15   # screen-px of total movement before classifying as drag
 PIXELS_PER_SCROLL = 30   # screen-px per one scroll-wheel click
 
+# Ghost-touch filter: contacts shorter than this are silently dropped.
+# Hardware ghost contacts typically last < 10 ms; real taps are > 80 ms.
+MIN_TAP_MS = 50
+
 # State machine constants
 IDLE, PENDING, SCROLLING, DRAGGING = 0, 1, 2, 3
 
@@ -114,18 +118,25 @@ class TouchSM:
         self.last_y     = 0
         self.scroll_rem = 0.0
         self.start_set  = False
+        self.touch_start_ms = 0   # monotonic ms when current contact began
 
     def touch_down(self):
         """Called when the first finger makes contact."""
-        self.state      = PENDING
-        self.start_set  = False
-        self.scroll_rem = 0.0
+        self.state          = PENDING
+        self.start_set      = False
+        self.scroll_rem     = 0.0
+        self.touch_start_ms = time.monotonic() * 1000
 
     def touch_up(self):
         """Called when the last finger lifts."""
-        dpy = self.dpy
+        dpy      = self.dpy
+        duration = time.monotonic() * 1000 - self.touch_start_ms
         if self.state == PENDING:
-            emit_tap(dpy, self.start_x, self.start_y)
+            if duration >= MIN_TAP_MS:
+                emit_tap(dpy, self.start_x, self.start_y)
+            else:
+                print(f"touch_filter: ghost tap suppressed ({duration:.1f} ms < {MIN_TAP_MS} ms)",
+                      flush=True)
         elif self.state == DRAGGING:
             xt.fake_input(dpy, X.ButtonRelease, 1)
             dpy.flush()

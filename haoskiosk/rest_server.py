@@ -1,7 +1,7 @@
 """-------------------------------------------------------------------------------
 # Add-on: HAOS Kiosk Display (haoskiosk)
 # File: services.py
-# Version: 1.3.1
+# Version: 1.3.2
 # Copyright Jeff Kosowsky
 # Date: April 2026
 
@@ -70,7 +70,7 @@ from typing import Any, Awaitable, cast, Callable, Final, Literal, TypedDict, Ty
 from aiohttp import web  #type: ignore[import-not-found] #pylint: disable=import-error
 
 #-------------------------------------------------------------------------------
-__version__ = "1.3.1"
+__version__ = "1.3.2"
 __author__ = "Jeff Kosowsky"
 __copyright__ = "Copyright 2025-2026 Jeff Kosowsky"
 

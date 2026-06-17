@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.3.2 - April 2026
+
+- Added explicit BUILD_FROM location to Dockerfile for ha core 2026.04+
+
 ## v1.3.1 - April 2026
 
 - Updated auto-login JS injection in 'userconf.lua' for 2026.4+

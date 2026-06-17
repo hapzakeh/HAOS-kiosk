@@ -410,9 +410,13 @@ webview.add_signal("init", function(view)
                     return Date.now() < suppressUntil;
                 }
 
+                console.log('GhostTouchFilter: installed, MIN_TOUCH_MS=' + MIN_TOUCH_MS);
+
                 document.addEventListener('touchstart', function(e) {
                     for (var i = 0; i < e.changedTouches.length; i++) {
-                        activeTouches.set(e.changedTouches[i].identifier, Date.now());
+                        var id = e.changedTouches[i].identifier;
+                        activeTouches.set(id, Date.now());
+                        console.log('GhostTouchFilter: touchstart id=' + id);
                     }
                 }, { passive: true, capture: true });
 
@@ -421,8 +425,10 @@ webview.add_signal("init", function(view)
                         var id = e.changedTouches[i].identifier;
                         var startTime = activeTouches.get(id);
                         activeTouches.delete(id);
-                        if (startTime !== undefined && (Date.now() - startTime) < MIN_TOUCH_MS) {
-                            console.log('GhostTouchFilter: suppressed touch id=' + id + ' duration=' + (Date.now() - startTime) + 'ms');
+                        var duration = startTime !== undefined ? (Date.now() - startTime) : -1;
+                        console.log('GhostTouchFilter: touchend id=' + id + ' duration=' + duration + 'ms (threshold=' + MIN_TOUCH_MS + ')');
+                        if (startTime !== undefined && duration < MIN_TOUCH_MS) {
+                            console.log('GhostTouchFilter: suppressed touch id=' + id + ' duration=' + duration + 'ms');
                             e.preventDefault();
                             e.stopImmediatePropagation();
                             // Suppress synthetic mouse/pointer events for 500 ms.

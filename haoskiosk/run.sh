@@ -363,6 +363,7 @@ xinput list | sed 's/^/  /'
 #### Start touch filter — grabs physical multi-touch screen and replaces it
 # with a single-touch virtual device, preventing GtkGestureZoom pinch-to-zoom
 # in WebKitGTK.  Must run while X is live so udev can hotplug the virtual device.
+chmod 666 /dev/uinput 2>/dev/null || true   # ensure uinput is writable
 if python3 -c "import evdev" >/dev/null 2>&1; then
     bashio::log.info "Starting touch_filter.py to block pinch-to-zoom..."
     python3 -u /touch_filter.py 2>&1 | sed 's/^/[touch_filter] /' &

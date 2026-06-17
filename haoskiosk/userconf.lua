@@ -400,7 +400,7 @@ webview.add_signal("init", function(view)
                 if (window._ghostTouchFilterInstalled) return;
                 window._ghostTouchFilterInstalled = true;
 
-                var MIN_TOUCH_MS = 200;
+                var MIN_TOUCH_MS = 50;
                 var activeTouches = new Map();
                 var suppressNextClick = false;
 

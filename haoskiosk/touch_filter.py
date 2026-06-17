@@ -133,10 +133,10 @@ class TouchSM:
         duration = time.monotonic() * 1000 - self.touch_start_ms
         if self.state == PENDING:
             if duration >= MIN_TAP_MS:
+                print(f"touch_filter: tap {duration:.1f} ms at ({self.start_x}, {self.start_y})", flush=True)
                 emit_tap(dpy, self.start_x, self.start_y)
             else:
-                print(f"touch_filter: ghost tap suppressed ({duration:.1f} ms < {MIN_TAP_MS} ms)",
-                      flush=True)
+                print(f"touch_filter: ghost tap suppressed ({duration:.1f} ms < {MIN_TAP_MS} ms)", flush=True)
         elif self.state == DRAGGING:
             xt.fake_input(dpy, X.ButtonRelease, 1)
             dpy.flush()

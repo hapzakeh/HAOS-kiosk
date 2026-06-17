@@ -415,6 +415,7 @@ webview.add_signal("init", function(view)
                         var startTime = activeTouches.get(id);
                         activeTouches.delete(id);
                         if (startTime !== undefined && (Date.now() - startTime) < MIN_TOUCH_MS) {
+                            console.log('GhostTouchFilter: suppressed touch id=' + id + ' duration=' + (Date.now() - startTime) + 'ms');
                             e.preventDefault();        // Suppresses synthetic click/mouseup/pointerup
                             e.stopImmediatePropagation();
                         }
@@ -447,6 +448,16 @@ webview.add_signal("init", function(view)
         ]]
         v:eval_js(js_disable_pinch_zoom, { source = "disable_pinch_zoom.js", no_return = true })
 
+    end)
+
+    -- Prevent pinch-to-zoom: WebKitGTK handles pinch gestures natively at the GTK layer,
+    -- so CSS touch-action and JS gesture events don't block it. Reset zoom_level whenever
+    -- WebKit changes it (e.g., via a pinch gesture).
+    view:add_signal("property::zoom_level", function(v)
+        local target = zoom_level / 100.0
+        if math.abs((v.zoom_level or 1.0) - target) > 0.001 then
+            v.zoom_level = target
+        end
     end)
 
     -- If browser_refresh set, then refresh browser every browser_refresh seconds after page finished/loaded/reloaded

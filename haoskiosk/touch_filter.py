@@ -90,7 +90,7 @@ def emit_scroll_v(dpy, delta_y, remainder):
     clicks = int(remainder / PIXELS_PER_SCROLL)
     if clicks:
         remainder -= clicks * PIXELS_PER_SCROLL
-        btn = 5 if clicks > 0 else 4
+        btn = 4 if clicks > 0 else 5
         for _ in range(abs(clicks)):
             xt.fake_input(dpy, X.ButtonPress,   btn)
             xt.fake_input(dpy, X.ButtonRelease, btn)

@@ -126,13 +126,11 @@ class TouchSM:
         self.start_set      = False
         self.scroll_rem     = 0.0
         self.touch_start_ms = time.monotonic() * 1000
-        print("touch_filter: touch_down", flush=True)
 
     def touch_up(self):
         """Called when the last finger lifts."""
         dpy      = self.dpy
         duration = time.monotonic() * 1000 - self.touch_start_ms
-        print(f"touch_filter: touch_up state={self.state} duration={duration:.1f}ms", flush=True)
         if self.state == PENDING:
             if duration >= MIN_TAP_MS:
                 print(f"touch_filter: tap {duration:.1f} ms at ({self.start_x}, {self.start_y})", flush=True)
@@ -205,16 +203,8 @@ def run_type_b(dev, dpy, sx, sy):
     first_slot = None
     cur_x = cur_y = 0
     sm = TouchSM(dpy)
-    _diag_count = 0   # limit diagnostic output to first 50 events
 
     for ev in dev.read_loop():
-        if _diag_count < 50:
-            print(f"touch_filter: ev type={ev.type} code={ev.code} value={ev.value}", flush=True)
-            _diag_count += 1
-        elif _diag_count == 50:
-            print("touch_filter: diagnostic limit reached, suppressing further raw events", flush=True)
-            _diag_count += 1
-
         if ev.type == ecodes.EV_ABS:
             if ev.code == ecodes.ABS_MT_SLOT:
                 cur_slot = ev.value

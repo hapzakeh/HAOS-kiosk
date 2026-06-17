@@ -431,19 +431,35 @@ webview.add_signal("init", function(view)
         ]]
         v:eval_js(js_ghost_touch_filter, { source = "ghost_touch_filter.js", no_return = true })
 
-        -- Disable pinch-to-zoom to mitigate ghost touch issues on touchscreens
-        -- Sets touch-action CSS to allow only panning, not zooming gestures
+        -- Disable pinch-to-zoom.
+        -- The touchscreen appears as a pointer device so the driver converts
+        -- pinch gestures to Ctrl+Scroll wheel events, which WebKit zooms on.
+        -- Block those wheel events when Ctrl is held, and also block touch-based
+        -- gesture events for completeness.
         local js_disable_pinch_zoom = [[
             (function() {
-                if (!document.getElementById('haoskiosk-no-pinch-zoom')) {
-                    var style = document.createElement('style');
-                    style.id = 'haoskiosk-no-pinch-zoom';
-                    style.textContent = 'html, body, * { touch-action: pan-x pan-y !important; }';
-                    (document.head || document.documentElement).appendChild(style);
-                    // Add gesture listeners once per document alongside the style guard
-                    document.addEventListener('gesturestart',  function(e) { e.preventDefault(); }, { passive: false, capture: true });
-                    document.addEventListener('gesturechange', function(e) { e.preventDefault(); }, { passive: false, capture: true });
-                }
+                if (window._haoskioskZoomBlocked) return;
+                window._haoskioskZoomBlocked = true;
+
+                // Block Ctrl+wheel zoom (primary mechanism on pointer-mode touchscreens)
+                document.addEventListener('wheel', function(e) {
+                    if (e.ctrlKey) {
+                        e.preventDefault();
+                        console.log('ZoomBlock: suppressed Ctrl+wheel deltaY=' + e.deltaY);
+                    }
+                }, { passive: false, capture: true });
+
+                // Block touch-gesture zoom (fallback for XI2 multitouch devices)
+                document.addEventListener('gesturestart',  function(e) { e.preventDefault(); }, { passive: false, capture: true });
+                document.addEventListener('gesturechange', function(e) { e.preventDefault(); }, { passive: false, capture: true });
+
+                // CSS belt-and-suspenders
+                var style = document.createElement('style');
+                style.id = 'haoskiosk-no-pinch-zoom';
+                style.textContent = 'html, body, * { touch-action: pan-x pan-y !important; }';
+                (document.head || document.documentElement).appendChild(style);
+
+                console.log('ZoomBlock: installed');
             })();
         ]]
         v:eval_js(js_disable_pinch_zoom, { source = "disable_pinch_zoom.js", no_return = true })

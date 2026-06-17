@@ -402,6 +402,7 @@ webview.add_signal("init", function(view)
 
                 var MIN_TOUCH_MS = 200;
                 var activeTouches = new Map();
+                var suppressNextClick = false;
 
                 document.addEventListener('touchstart', function(e) {
                     for (var i = 0; i < e.changedTouches.length; i++) {
@@ -418,9 +419,22 @@ webview.add_signal("init", function(view)
                             console.log('GhostTouchFilter: suppressed touch id=' + id + ' duration=' + (Date.now() - startTime) + 'ms');
                             e.preventDefault();        // Suppresses synthetic click/mouseup/pointerup
                             e.stopImmediatePropagation();
+                            suppressNextClick = true;  // Belt-and-suspenders: also block the click event
                         }
                     }
                 }, { passive: false, capture: true });
+
+                // WebKitGTK dispatches a synthetic click independently of the touch
+                // sequence, so preventDefault on touchend alone does not always cancel
+                // it.  Intercept click in capture phase and drop it when flagged.
+                document.addEventListener('click', function(e) {
+                    if (suppressNextClick) {
+                        suppressNextClick = false;
+                        e.preventDefault();
+                        e.stopImmediatePropagation();
+                        console.log('GhostTouchFilter: suppressed click');
+                    }
+                }, { capture: true });
 
                 document.addEventListener('touchcancel', function(e) {
                     for (var i = 0; i < e.changedTouches.length; i++) {

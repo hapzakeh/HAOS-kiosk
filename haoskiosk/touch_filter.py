@@ -205,8 +205,16 @@ def run_type_b(dev, dpy, sx, sy):
     first_slot = None
     cur_x = cur_y = 0
     sm = TouchSM(dpy)
+    _diag_count = 0   # limit diagnostic output to first 50 events
 
     for ev in dev.read_loop():
+        if _diag_count < 50:
+            print(f"touch_filter: ev type={ev.type} code={ev.code} value={ev.value}", flush=True)
+            _diag_count += 1
+        elif _diag_count == 50:
+            print("touch_filter: diagnostic limit reached, suppressing further raw events", flush=True)
+            _diag_count += 1
+
         if ev.type == ecodes.EV_ABS:
             if ev.code == ecodes.ABS_MT_SLOT:
                 cur_slot = ev.value

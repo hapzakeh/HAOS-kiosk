@@ -432,16 +432,32 @@ webview.add_signal("init", function(view)
         v:eval_js(js_ghost_touch_filter, { source = "ghost_touch_filter.js", no_return = true })
 
         -- Disable pinch-to-zoom.
-        -- The touchscreen appears as a pointer device so the driver converts
-        -- pinch gestures to Ctrl+Scroll wheel events, which WebKit zooms on.
-        -- Block those wheel events when Ctrl is held, and also block touch-based
-        -- gesture events for completeness.
+        -- Pinch zoom is applied by GtkGestureZoom at the GTK compositor level.
+        -- WebKitGTK's ViewGestureController checks the viewport user-scalable flag
+        -- before applying gesture scale, so user-scalable=no is the correct hook.
+        -- Also block Ctrl+wheel and touch gesture events as belt-and-suspenders.
         local js_disable_pinch_zoom = [[
             (function() {
                 if (window._haoskioskZoomBlocked) return;
                 window._haoskioskZoomBlocked = true;
 
-                // Block Ctrl+wheel zoom (primary mechanism on pointer-mode touchscreens)
+                // Set viewport user-scalable=no — WebKitGTK's gesture controller
+                // respects this and will skip applying pinch scale
+                var meta = document.querySelector('meta[name="viewport"]');
+                if (!meta) {
+                    meta = document.createElement('meta');
+                    meta.name = 'viewport';
+                    (document.head || document.documentElement).appendChild(meta);
+                }
+                var content = meta.content || '';
+                // Remove existing scale limits then add ours
+                content = content.replace(/,?\s*user-scalable\s*=[^,]*/gi, '')
+                                 .replace(/,?\s*maximum-scale\s*=[^,]*/gi, '')
+                                 .replace(/,?\s*minimum-scale\s*=[^,]*/gi, '');
+                meta.content = (content ? content + ', ' : '') + 'user-scalable=no, maximum-scale=1.0, minimum-scale=1.0';
+                console.log('ZoomBlock: viewport=' + meta.content);
+
+                // Block Ctrl+wheel zoom
                 document.addEventListener('wheel', function(e) {
                     if (e.ctrlKey) {
                         e.preventDefault();
@@ -449,60 +465,22 @@ webview.add_signal("init", function(view)
                     }
                 }, { passive: false, capture: true });
 
-                // Block touch-gesture zoom (fallback for XI2 multitouch devices)
+                // Block Safari-style touch gesture events
                 document.addEventListener('gesturestart',  function(e) { e.preventDefault(); }, { passive: false, capture: true });
                 document.addEventListener('gesturechange', function(e) { e.preventDefault(); }, { passive: false, capture: true });
 
-                // CSS belt-and-suspenders
+                // CSS touch-action
                 var style = document.createElement('style');
-                style.id = 'haoskiosk-no-pinch-zoom';
                 style.textContent = 'html, body, * { touch-action: pan-x pan-y !important; }';
                 (document.head || document.documentElement).appendChild(style);
-
-                console.log('ZoomBlock: installed');
             })();
         ]]
         v:eval_js(js_disable_pinch_zoom, { source = "disable_pinch_zoom.js", no_return = true })
 
     end)
 
-    -- Prevent pinch-to-zoom: poll zoom_level and reset if changed by a gesture.
-    -- Diagnostic: logs every 5s so we can confirm the timer is running and see
-    -- the actual zoom_level value. Remove the periodic log once confirmed working.
-    local zoom_guard = timer { interval = 500 }
-    local zoom_guard_tick = 0
-    zoom_guard:add_signal("timeout", function()
-        zoom_guard_tick = zoom_guard_tick + 1
-        -- Log FIRST before any property access, so we always see this even if view.zoom_level throws
-        if zoom_guard_tick % 10 == 0 then
-            msg.info("ZoomGuard tick=%d", zoom_guard_tick)
-        end
-        -- Safely read zoom_level — luakit userdata throws on unknown properties
-        local ok, current = pcall(function() return view.zoom_level end)
-        if not ok then
-            if zoom_guard_tick % 10 == 0 then
-                msg.info("ZoomGuard: view.zoom_level unavailable: %s", tostring(current))
-            end
-            return
-        end
-        if zoom_guard_tick % 10 == 0 then
-            msg.info("ZoomGuard: zoom_level=%s (target=%d)", tostring(current), zoom_level)
-        end
-        if current == nil then return end
-        -- zoom_level env var is a percentage (e.g. 100); view.zoom_level may be
-        -- fractional (1.0) or percentage (100) depending on luakit version —
-        -- handle both: if current > 10 assume percentage scale
-        local target = (current > 10) and zoom_level or (zoom_level / 100.0)
-        if math.abs(current - target) > 0.5 then
-            msg.info("ZoomGuard: pinch detected zoom_level=%s target=%s, resetting", tostring(current), tostring(target))
-            view.zoom_level = target
-        end
-    end)
-    zoom_guard:start()
-    view:add_signal("destroy", function()
-        zoom_guard:stop()
-        zoom_guard = nil
-    end)
+    -- (zoom guard removed: pinch zoom is applied by GtkGestureZoom at GTK compositor
+    -- level and does not change view.zoom_level, so polling cannot detect or reset it)
 
     -- If browser_refresh set, then refresh browser every browser_refresh seconds after page finished/loaded/reloaded
     if browser_refresh > 0 then

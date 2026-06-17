@@ -457,11 +457,20 @@ webview.add_signal("init", function(view)
     local zoom_guard_tick = 0
     zoom_guard:add_signal("timeout", function()
         zoom_guard_tick = zoom_guard_tick + 1
-        local current = view.zoom_level
-        -- Log every 10 ticks (every 5s) so we can confirm the timer is alive
-        -- and see what zoom_level actually looks like (fraction vs percentage)
+        -- Log FIRST before any property access, so we always see this even if view.zoom_level throws
         if zoom_guard_tick % 10 == 0 then
-            msg.info("ZoomGuard tick=%d zoom_level=%s (target=%d)", zoom_guard_tick, tostring(current), zoom_level)
+            msg.info("ZoomGuard tick=%d", zoom_guard_tick)
+        end
+        -- Safely read zoom_level — luakit userdata throws on unknown properties
+        local ok, current = pcall(function() return view.zoom_level end)
+        if not ok then
+            if zoom_guard_tick % 10 == 0 then
+                msg.info("ZoomGuard: view.zoom_level unavailable: %s", tostring(current))
+            end
+            return
+        end
+        if zoom_guard_tick % 10 == 0 then
+            msg.info("ZoomGuard: zoom_level=%s (target=%d)", tostring(current), zoom_level)
         end
         if current == nil then return end
         -- zoom_level env var is a percentage (e.g. 100); view.zoom_level may be
@@ -469,7 +478,7 @@ webview.add_signal("init", function(view)
         -- handle both: if current > 10 assume percentage scale
         local target = (current > 10) and zoom_level or (zoom_level / 100.0)
         if math.abs(current - target) > 0.5 then
-            msg.info("Pinch zoom detected: zoom_level=%s target=%s, resetting", tostring(current), tostring(target))
+            msg.info("ZoomGuard: pinch detected zoom_level=%s target=%s, resetting", tostring(current), tostring(target))
             view.zoom_level = target
         end
     end)

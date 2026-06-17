@@ -424,6 +424,7 @@ rm /tmp/new_keybinds.xml
 
 # Start openbox
 openbox &
+O_PID=$!
 
 # Start picom compositor to prevent stale X11 rendering artifacts (ghost/overlapping views)
 picom --daemon --backend xrender --no-fading-openclose 2>/dev/null &
@@ -431,8 +432,6 @@ picom --daemon --backend xrender --no-fading-openclose 2>/dev/null &
 #WINMGR=xfwm4  #Alternately using xfwm4
 #xfsettingsd &
 #startxfce4 &
-
-O_PID=$!
 sleep 0.5  #Ensure window manager starts
 if ! kill -0 "$O_PID" 2>/dev/null; then  #Checks if process alive
     bashio::log.error "Failed to start $WINMGR window  manager"

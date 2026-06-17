@@ -450,23 +450,27 @@ webview.add_signal("init", function(view)
 
     end)
 
-    -- Route JS console messages to luakit log (enable_write_console_messages_to_stdout
-    -- does not reliably capture output from eval_js injected scripts)
-    view:add_signal("console-message", function(v, message, line, source)
-        msg.info("JS [%s:%d]: %s", source or "?", line or 0, message)
-    end)
-
-    -- Prevent pinch-to-zoom: WebKitGTK handles pinch gestures natively at the GTK layer,
-    -- so CSS touch-action and JS gesture events don't block it. Poll zoom_level and reset
-    -- it if a pinch gesture changes it.
-    local zoom_target = zoom_level / 100.0
-    local zoom_guard = timer { interval = 100 }
+    -- Prevent pinch-to-zoom: poll zoom_level and reset if changed by a gesture.
+    -- Diagnostic: logs every 5s so we can confirm the timer is running and see
+    -- the actual zoom_level value. Remove the periodic log once confirmed working.
+    local zoom_guard = timer { interval = 500 }
+    local zoom_guard_tick = 0
     zoom_guard:add_signal("timeout", function()
-        if not view.is_alive then return end
-        local current = view.zoom_level or 1.0
-        if math.abs(current - zoom_target) > 0.001 then
-            msg.info("Pinch zoom detected (%.2f -> %.2f), resetting", current, zoom_target)
-            view.zoom_level = zoom_target
+        zoom_guard_tick = zoom_guard_tick + 1
+        local current = view.zoom_level
+        -- Log every 10 ticks (every 5s) so we can confirm the timer is alive
+        -- and see what zoom_level actually looks like (fraction vs percentage)
+        if zoom_guard_tick % 10 == 0 then
+            msg.info("ZoomGuard tick=%d zoom_level=%s (target=%d)", zoom_guard_tick, tostring(current), zoom_level)
+        end
+        if current == nil then return end
+        -- zoom_level env var is a percentage (e.g. 100); view.zoom_level may be
+        -- fractional (1.0) or percentage (100) depending on luakit version —
+        -- handle both: if current > 10 assume percentage scale
+        local target = (current > 10) and zoom_level or (zoom_level / 100.0)
+        if math.abs(current - target) > 0.5 then
+            msg.info("Pinch zoom detected: zoom_level=%s target=%s, resetting", tostring(current), tostring(target))
+            view.zoom_level = target
         end
     end)
     zoom_guard:start()

@@ -90,7 +90,7 @@ def emit_scroll_v(dpy, delta_y, remainder):
     clicks = int(remainder / PIXELS_PER_SCROLL)
     if clicks:
         remainder -= clicks * PIXELS_PER_SCROLL
-        btn = 4 if clicks > 0 else 5
+        btn = 5 if clicks > 0 else 4
         for _ in range(abs(clicks)):
             xt.fake_input(dpy, X.ButtonPress,   btn)
             xt.fake_input(dpy, X.ButtonRelease, btn)
@@ -171,7 +171,7 @@ class TouchSM:
 
         if self.state == SCROLLING:
             dy = cur_y - self.last_y
-            self.scroll_rem = emit_scroll_v(dpy, dy, self.scroll_rem)
+            self.scroll_rem = emit_scroll_v(dpy, -dy, self.scroll_rem)
             self.last_x = cur_x
             self.last_y = cur_y
 

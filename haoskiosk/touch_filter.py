@@ -140,11 +140,19 @@ class TouchSM:
 
         if self.state == PENDING:
             if not self.start_set:
-                # First position report after touch down — record origin
+                # First position report after touch down — record origin and
+                # move cursor to finger position so scroll events hit the right element
                 self.start_x = self.last_x = cur_x
                 self.start_y = self.last_y = cur_y
                 self.start_set = True
+                emit_move(dpy, cur_x, cur_y)
+                dpy.flush()
                 return
+
+            # Keep cursor under finger while still deciding gesture type —
+            # this ensures scroll-wheel events land on the element being touched
+            emit_move(dpy, cur_x, cur_y)
+            dpy.flush()
 
             dx = cur_x - self.start_x
             dy = cur_y - self.start_y

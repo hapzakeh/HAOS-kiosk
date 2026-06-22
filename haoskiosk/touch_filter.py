@@ -24,7 +24,7 @@ PIXELS_PER_SCROLL = 30   # screen-px per one scroll-wheel click
 
 # Ghost-touch filter: contacts shorter than this are silently dropped.
 # Hardware ghost contacts typically last < 10 ms; real taps are > 80 ms.
-MIN_TAP_MS = 50
+MIN_TAP_MS = 80
 
 # State machine constants
 IDLE, PENDING, SCROLLING, DRAGGING = 0, 1, 2, 3
